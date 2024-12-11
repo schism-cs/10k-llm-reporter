@@ -1,12 +1,17 @@
-from enum import Enum
-from llmsherpa.readers import LayoutPDFReader, Block, Paragraph, Section, Table, ListItem, Document
-from chromadb import Client, Settings
-from langchain_community.embeddings import OpenAIEmbeddings
-from dataclasses import dataclass, field
-
-import json
 import os
-from typing import List, Dict, NamedTuple
+import json
+from enum import Enum
+from typing import List, Dict
+
+from dotenv import load_dotenv
+from dataclasses import dataclass, field
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from llmsherpa.readers import LayoutPDFReader, Block, Paragraph, Section, Table, ListItem, Document
+
+load_dotenv()
+
+
 
 class BlockType(Enum):
     PARAGRAPH = 0
@@ -27,10 +32,17 @@ class ContentBlock:
     parent_chain: list[str] = field(default_factory=list)
     block_type: BlockType = BlockType.PARAGRAPH
     
+    def get_metadata(self) -> Dict:
+        return {
+            "page_idx": self.page_idx,
+            "parent_chain": self.parent_chain,
+            #"block_type": self.block_type
+        }
+    
 
 class PDFProcessor:
     def __init__(self):
-        self.pdf_reader = LayoutPDFReader("http://localhost:5010/api/parseDocument?renderFormat=all&useNewIndentParser=true")
+        self.pdf_reader = LayoutPDFReader(os.getenv("LLMSHERPA_ENDPOINT"))
         
         self.all_chunks: Dict[int, Block]= {}
         self.paragraphs: List[Paragraph]= []
@@ -39,6 +51,17 @@ class PDFProcessor:
         self.tables: List[Table] = []
         
         self.content_blocks: List[ContentBlock] = []
+
+        self.embedding_function = OpenAIEmbeddings(
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+        
+        self.vector_store =  Chroma(
+            collection_name="document_content",
+            embedding_function=self.embedding_function,
+            persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+        )
+        
     
     def extract_text(self, pdf_path: str) -> List[ContentBlock]:
         """Extract and process different types of content from PDF."""
@@ -152,9 +175,31 @@ class PDFProcessor:
         return block
         
     def _process_tables(self):
-        # to_text -> markdown + context (parent_chain)
-        return []
+        for table in self.tables:
+            block = ContentBlock(
+                block_idx = table.block_idx,
+                bbox = table.bbox,
+                block_type = BlockType.TABLE,
+                original_text = table.to_html(),
+                processed_text = table.to_text(), # Markdown format
+                page_idx=table.page_idx,
+                parent_chain=self._format_parent_chain(table)
+            )
+            self.content_blocks.append(block)
     
+    
+    def store_content(self) -> None:
+        texts = []
+        metadatas = []
+        for block in self.content_blocks:
+            texts.append(block.parent_chain + " \n " + block.processed_text)
+            metadatas.append(block.get_metadata())
+        
+        self.vector_store.add_texts(
+            texts=texts,
+            metadatas=metadatas
+        )
+        
 
 from markdownify import markdownify as md
     
@@ -170,3 +215,8 @@ if __name__ == "__main__":
             print(block.parent_chain)
             print(block.processed_text)
             print()
+            
+    #pdf_processor.store_content()
+    
+    for res in pdf_processor.vector_store.similarity_search("what is the cost of revenue for 2023?", k = 8):
+        print(res)
