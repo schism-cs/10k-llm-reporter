@@ -1,26 +1,25 @@
 import os
-import json
 from enum import Enum
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from dotenv import load_dotenv
 from dataclasses import dataclass, field
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
-from llmsherpa.readers import LayoutPDFReader, Block, Paragraph, Section, Table, ListItem, Document
+from langchain_core.documents import Document
+from llmsherpa.readers import LayoutPDFReader, Block, Paragraph, Section, Table, ListItem
+from llmsherpa.readers import Document as SherpaDocument
 
 load_dotenv()
 
 
 
 class BlockType(Enum):
-    PARAGRAPH = 0
-    HEADER = 1
-    LIST = 2
-    TABLE = 3
+    PARAGRAPH = "paragraph"
+    HEADER = "header"
+    LIST = "list"
+    TABLE = "table"
 
-class ParsedDocument:
-    pass
 
 @dataclass
 class ContentBlock:
@@ -36,9 +35,44 @@ class ContentBlock:
         return {
             "page_idx": self.page_idx,
             "parent_chain": self.parent_chain,
-            #"block_type": self.block_type
+            "block_type": self.block_type.value
         }
+
+class VectorStoreManager:
+    def __init__(self) -> None:
+        self.embedding_function = OpenAIEmbeddings(
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+        
+        self.create_collection("document_content")
     
+    def create_collection(self, collection_name: str) -> None:
+        self.vector_store =  Chroma(
+            collection_name=collection_name,
+            embedding_function=self.embedding_function,
+            persist_directory=f"./{collection_name}_db"
+        )
+    
+    def reset_store(self):
+        self.vector_store.delete_collection()
+        self.create_collection("document_content")
+        
+    def store_content(self, content_blocks: List[ContentBlock]) -> None:
+        texts = []
+        metadatas = []
+        for block in content_blocks:
+            texts.append(block.parent_chain + " \n " + block.processed_text)
+            metadatas.append(block.get_metadata())
+        
+        self.vector_store.add_texts(
+            texts=texts,
+            metadatas=metadatas
+        )
+        
+    def retrieve_content(self, query: str, filter: Optional[Dict[str, str]] = None) -> List[Document]:
+        return self.vector_store.similarity_search(query, k=8, filter=filter)
+    
+
 
 class PDFProcessor:
     def __init__(self):
@@ -51,16 +85,6 @@ class PDFProcessor:
         self.tables: List[Table] = []
         
         self.content_blocks: List[ContentBlock] = []
-
-        self.embedding_function = OpenAIEmbeddings(
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
-        
-        self.vector_store =  Chroma(
-            collection_name="document_content",
-            embedding_function=self.embedding_function,
-            persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-        )
         
     
     def extract_text(self, pdf_path: str) -> List[ContentBlock]:
@@ -81,7 +105,7 @@ class PDFProcessor:
         print(f"Tables: {len(self.tables)}")        
         print(f"Sections: {len(self.headers)}")        
     
-    def _categorize_document_blocks(self, document: Document):
+    def _categorize_document_blocks(self, document: SherpaDocument):
         chunk : Block
         for chunk in document.chunks():
             if chunk.tag == "para":
@@ -188,35 +212,19 @@ class PDFProcessor:
             self.content_blocks.append(block)
     
     
-    def store_content(self) -> None:
-        texts = []
-        metadatas = []
-        for block in self.content_blocks:
-            texts.append(block.parent_chain + " \n " + block.processed_text)
-            metadatas.append(block.get_metadata())
-        
-        self.vector_store.add_texts(
-            texts=texts,
-            metadatas=metadatas
-        )
-        
-
-from markdownify import markdownify as md
-    
 if __name__ == "__main__":
     pdf_processor = PDFProcessor()
+    
+    vector_store = VectorStoreManager()
+    vector_store.reset_store()
     
     content_blocks = pdf_processor.extract_text("./data/2023-annual-report-short.pdf")
     
     pdf_processor.document_stats()
 
-    for block in pdf_processor.content_blocks:
-        if block.block_type == BlockType.LIST:
-            print(block.parent_chain)
-            print(block.processed_text)
-            print()
-            
-    #pdf_processor.store_content()
+    vector_store.store_content(content_blocks)
     
-    for res in pdf_processor.vector_store.similarity_search("what is the cost of revenue for 2023?", k = 8):
-        print(res)
+    docs = vector_store.retrieve_content("What was the annual revenue in 2023?")
+    for d in docs:
+        print(d)
+    
