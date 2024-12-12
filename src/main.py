@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel
 
 from report_pipeline.pdf_processor import PDFProcessor, VectorStoreManager
@@ -10,6 +12,14 @@ from report_pipeline.utils.generation import generators, queries
 app = FastAPI(
     title="Report Generation API",
     description="API for generating stakeholder-specific reports from PDF documents"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 class ReportRequest(BaseModel):

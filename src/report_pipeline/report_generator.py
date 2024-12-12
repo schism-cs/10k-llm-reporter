@@ -20,9 +20,9 @@ class ReportType(str, Enum):
 
 class SlideContent(BaseModel):
     title: str = Field(description="Section title", default="")
-    content: List[str] = Field(description="Bullet points or paragraphs, formatted in Markdown. Not containing any table information.", default="")
     table_caption: str = Field(description="Optional table caption, describing the data", default="")
     table: str = Field(description="Optional table diplaying header and auxiliary data to the content, formatted in Markdown", default="")
+    content: List[str] = Field(description="Bullet points or paragraphs, formatted in Markdown. If there's a table, this should ONLY contain insights on the table contents", default="")
     recommendations: List[str] = Field(description="Action items or recommendations", default=[])
     slide_type: Literal['summary', 'content', 'action_items'] = Field(description="Type of slide")
 
