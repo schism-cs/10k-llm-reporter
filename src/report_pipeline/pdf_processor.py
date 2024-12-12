@@ -10,6 +10,7 @@ from langchain_core.documents import Document
 from llmsherpa.readers import LayoutPDFReader, Block, Paragraph, Section, Table, ListItem
 from llmsherpa.readers import Document as SherpaDocument
 
+
 load_dotenv()
 
 
@@ -211,20 +212,9 @@ class PDFProcessor:
             )
             self.content_blocks.append(block)
     
-    
-if __name__ == "__main__":
-    pdf_processor = PDFProcessor()
-    
-    vector_store = VectorStoreManager()
-    vector_store.reset_store()
-    
-    content_blocks = pdf_processor.extract_text("./data/2023-annual-report-short.pdf")
-    
-    pdf_processor.document_stats()
 
-    vector_store.store_content(content_blocks)
     
-    docs = vector_store.retrieve_content("What was the annual revenue in 2023?")
-    for d in docs:
-        print(d)
+    
+    
+    
     
