@@ -13,8 +13,6 @@ from llmsherpa.readers import Document as SherpaDocument
 
 load_dotenv()
 
-
-
 class BlockType(Enum):
     PARAGRAPH = "paragraph"
     HEADER = "header"
@@ -36,6 +34,7 @@ class ContentBlock:
         return {
             "page_idx": self.page_idx,
             "parent_chain": self.parent_chain,
+            "block_idx": self.block_idx,
             "block_type": self.block_type.value
         }
 
@@ -62,7 +61,7 @@ class VectorStoreManager:
         texts = []
         metadatas = []
         for block in content_blocks:
-            texts.append(block.parent_chain + " \n " + block.processed_text)
+            texts.append(block.processed_text)
             metadatas.append(block.get_metadata())
         
         self.vector_store.add_texts(
@@ -71,7 +70,7 @@ class VectorStoreManager:
         )
         
     def retrieve_content(self, query: str, filter: Optional[Dict[str, str]] = None) -> List[Document]:
-        return self.vector_store.similarity_search(query, k=8, filter=filter)
+        return self.vector_store.similarity_search(query, k=4, filter=filter)
     
 
 

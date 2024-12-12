@@ -1,50 +1,57 @@
-from enum import Enum
-from typing import Dict
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 from report_pipeline.pdf_processor import PDFProcessor, VectorStoreManager
-from report_pipeline.report_generator import CEOReportGenerator, CFOReportGenerator, COOReportGenerator, ReportGenerator
+from report_pipeline.report_generator import Presentation, ReportType
 
+from report_pipeline.utils.search_results import SearchResults
+from report_pipeline.utils.generation import generators, queries
 
-class ReportType(str, Enum):
-    CFO = "cfo"
-    CEO = "ceo"
-    COO = "coo"
-    
-    
-if __name__ == "__main__":
-    pdf_processor = PDFProcessor()
-    
+app = FastAPI(
+    title="Report Generation API",
+    description="API for generating stakeholder-specific reports from PDF documents"
+)
+
+class ReportRequest(BaseModel):
+    report_type: ReportType
+
+@app.post("/generate_report", response_model=Presentation)
+async def generate_report(request: ReportRequest):
     vector_store = VectorStoreManager()
-    vector_store.reset_store()
     
-    content_blocks = pdf_processor.extract_text("./data/2023-annual-report-short.pdf")
-    
-    pdf_processor.document_stats()
-
-    vector_store.store_content(content_blocks)
-    
-    selected_type = ReportType.CFO
-    
-    generators : Dict[ReportType, ReportGenerator]= {
-        ReportType.CFO: CFOReportGenerator(),
-        ReportType.CEO: CEOReportGenerator(),
-        ReportType.COO: COOReportGenerator()
-    }
-    
-    queries : Dict[ReportType, str] = {
-        ReportType.CFO: "financial metrics, costs, and revenue analysis",
-        ReportType.CEO: "strategic insights, market position, and business performance",
-        ReportType.COO: "operational efficiency, processes, and resource utilization"
-    }
+    selected_type = request.report_type
     
     generator = generators[selected_type]
     query = queries[selected_type]
 
-    docs = vector_store.retrieve_content(query)
-    for d in docs:
-        print(d)
+    search_results = SearchResults()
+    for query in queries:
+        docs = vector_store.retrieve_content(query)
+        for doc in docs:
+            search_results.add_result(doc)
         
-    generator.create_report(docs)
+    generator.create_report(search_results.get_results())
     
     print(generator.report_content)
     
+    return generator.report_content
+        
+@app.get("/reindex_document")
+async def reindex_doc():
+    vector_store = VectorStoreManager()
+    
+    pdf_processor = PDFProcessor()
+    
+    vector_store.reset_store()
+    
+    content_blocks = pdf_processor.extract_text("./data/2023-annual-report.pdf")
+    
+    pdf_processor.document_stats()
+    
+    vector_store.store_content(content_blocks)
+    
+    return "ok"
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"} 
