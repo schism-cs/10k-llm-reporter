@@ -1,4 +1,3 @@
 .venv
 *.pyc
 .env
-document_content_db
