@@ -20,9 +20,25 @@ queries : Dict[ReportType, list[str]] = {
         "Forecasting financial risks and opportunities"
     ],
     ReportType.CEO: [
-        "strategic insights, market position, and business performance"
+        "Strategic insights, market position, and business performance",
+        "Revenue growth trends and competitive positioning",
+        "Business expansion opportunities and challenges",
+        "Market share analysis and industry trends",
+        "High-level performance overview and key milestones",
+        "Long-term vision and strategic planning",
+        "Leadership priorities and organizational direction",
+        "Key risks impacting business strategy",
+        "Emerging market opportunities and innovation potential"
     ],
     ReportType.COO: [
-        "operational efficiency, processes, and resource utilization"
+        "Operational efficiency, processes, and resource utilization",
+        "Bottleneck identification and resolution strategies",
+        "Key operational performance indicators (KPIs)",
+        "Supply chain performance and logistics optimization",
+        "Workforce productivity and resource allocation",
+        "Process improvements and cost-saving initiatives",
+        "Infrastructure utilization and capacity planning",
+        "Operational risks and mitigation plans",
+        "Sustainability and environmental efficiency in operations"
     ]
 }
