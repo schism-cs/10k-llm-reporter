@@ -32,7 +32,7 @@ class Presentation(BaseModel):
 
 class ReportGenerator(ABC):
     def __init__(self):
-        self.llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_tokens=2000, temperature=0.2)
+        self.llm = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), max_tokens=2000, temperature=0.4)
         self.output_parser = PydanticOutputParser(pydantic_object=Presentation)
         self.report_content: Presentation = []
         self.presentation = None
@@ -41,24 +41,17 @@ class ReportGenerator(ABC):
         """Create complete report with all sections."""
 
         self.report_content = self.generate_report_content(data)
-        
-        self._create_cover_slide()
-        self._create_content_slides()
-        self._create_action_items_slide()
+        self.report_content = self._post_process_content()
 
     @abstractmethod
     def generate_report_content(self, data: List[Document]) -> Presentation:
         pass
     
-    def _create_cover_slide(self):
-        pass
-        
-    def _create_content_slides(self):
-        pass
-    
-    def _create_action_items_slide(self):
-        pass
-        
+    def _post_process_content(self):
+        for slide in self.report_content.slides:
+            bulleted = list(map(lambda sentence: " - " + sentence if not sentence.strip().startswith("-") and not sentence.strip().endswith(":") else sentence, slide.content))
+            slide.content = bulleted
+        return self.report_content
 
 class CFOReportGenerator(ReportGenerator):
     def generate_report_content(self, data: List[Document]) -> Presentation:
@@ -110,7 +103,7 @@ class CEOReportGenerator(ReportGenerator):
         
         prompt = PromptTemplate(
             template="""
-            Based on the following business data, generate a CEO report tailored for presentation purposes:
+            Based on the following business data, generate a CEO report:
 
             Requirements:
             1. Focus Areas:
@@ -119,7 +112,7 @@ class CEOReportGenerator(ReportGenerator):
                 - Provide a long-term outlook, detailing key decisions required to achieve organizational goals and sustain growth.
             
             2. Structure of the Report:
-                - Summary Slide: Condense the most critical insights into a single, impactful slide that captures the CEO's immediate attention. Keep it short.
+                - Summary Slide: Condense the most critical insights into a single, CONCISE and impactful bullet point list. Keep it short.
                 - Pages: Include at least two slides or pages that detail:
                     - Business performance insights, with a focus on high-level metrics and trends.
                     - Strategic opportunities and market positioning, supported by relevant data or examples.
