@@ -17,7 +17,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
+COPY data/ ./data/
+COPY document_content_db ./document_content_db/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.report_pipeline.api:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uvicorn", "--app-dir", "./src", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
